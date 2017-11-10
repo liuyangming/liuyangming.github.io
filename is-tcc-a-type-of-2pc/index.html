@@ -1,0 +1,195 @@
+<!DOCTYPE HTML>
+<html>
+<head>
+  <meta charset="utf-8">
+  
+  <title>TCC是两阶段提交的一种么？ | 百特开源</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+  
+  
+
+  <link href="//netdna.bootstrapcdn.com/font-awesome/4.0.3/css/font-awesome.css" rel="stylesheet">
+  <link rel="stylesheet" href="/css/pure-min.css" type="text/css">
+  <link rel="stylesheet" href="/css/biture.css" type="text/css">
+  <!--[if lt IE 9]><script src="//html5shiv.googlecode.com/svn/trunk/html5.js"></script><![endif]-->
+  
+
+</head>
+
+
+<body>
+  <header id="header">
+    <div class="wrap">
+  <div class="inner">
+    <a class="brand" href="/">百特开源</a>
+    <a id="menu-toggle" href="#"><i class="fa fa-bars"></i></a>
+<ul class="nav-menu">
+
+
+    <li><a href="/">Home</a></li>
+
+
+
+    <li><a href="//github.com/liuyangming/bytetcc">ByteTCC</a></li>
+
+
+
+    <li><a href="//github.com/liuyangming/bytejta">ByteJTA</a></li>
+
+
+</ul>
+
+<ul class="nav-menu ext-menu">
+
+
+    <li><a href="//github.com/liuyangming/">github</a></li>
+
+
+
+    <li><a href="//hexo.io/">hexo</a></li>
+
+
+  <li><a class="various" href="#fbox-tagcloud">tags</a></li>
+</ul>
+</div>
+
+  </div>
+</div>
+
+<div class="tagcloud" id="fbox-tagcloud" style="margin:10px; display:none; overflow: hidden"><a href="/tags/ByteTCC/" style="font-size: 14px;">ByteTCC</a> <a href="/tags/TCC/" style="font-size: 14px;">TCC</a> <a href="/tags/Transaction/" style="font-size: 14px;">Transaction</a></div>
+
+  </header>
+  <div id="main-content" class="wrap">
+  <div class="inner">
+    <article class="post">
+  <div class="pure-g">
+
+    <!-- article: meta -->
+    <div class="pure-u-1-12 article-meta">
+      <div class="date"><time datetime="2017-09-11T07:53:19.000Z">
+        <div class="day">11</div>
+        <div class="month">Sep 2017</div>
+      </time></div>
+      <div class="article-tags">
+        
+  
+    <a href='/tags/TCC/' class='pure-button pull-right' style='margin:3px;'>TCC</a>
+  
+    <a href='/tags/Transaction/' class='pure-button pull-right' style='margin:3px;'>Transaction</a>
+  
+    <a href='/tags/ByteTCC/' class='pure-button pull-right' style='margin:3px;'>ByteTCC</a>
+  
+
+
+      </div>
+    </div>
+
+    <!-- article: main -->
+    <div class="pure-u-11-12">
+      <header><div class="article-title">
+        
+  
+    <h1 class="title">TCC是两阶段提交的一种么？</h1>
+  
+
+      </div></header>
+      <div class="article-entry">
+        
+          <p>经常在网络上看见有人介绍TCC时，都提一句，”TCC是两阶段提交的一种”。其理由是TCC将业务逻辑分成try、confirm/cancel在两个不同的阶段中执行。其实这个说法，是不正确的。可能是因为既不太了解两阶段提交机制、也不太了解TCC机制的缘故，于是将两阶段提交机制的prepare、commit两个事务提交阶段和TCC机制的try、confirm/cancel两个业务执行阶段互相混淆，才有了这种说法。    </p>
+<p>两阶段提交（Two Phase Commit，下文简称2PC），简单的说，是将事务的提交操作分成了prepare、commit两个阶段。其事务处理方式为：<br>1、 在全局事务决定提交时，a）逐个向RM发送prepare请求；b）若所有RM都返回OK，则逐个发送commit请求最终提交事务；否则，逐个发送rollback请求来回滚事务；<br>2、 在全局事务决定回滚时，直接逐个发送rollback请求即可，不必分阶段。<br><em>*</em> 需要注意的是：2PC机制需要RM提供底层支持（一般是兼容XA），而TCC机制则不需要。</p>
+<p>TCC（Try-Confirm-Cancel），则是将业务逻辑分成try、confirm/cancel两个阶段执行，具体介绍见<a href="http://www.bytesoft.org/tcc-intro/" target="_blank" rel="external">TCC事务机制简介</a>。其事务处理方式为：<br>1、 在全局事务决定提交时，调用与try业务逻辑相对应的confirm业务逻辑；<br>2、 在全局事务决定回滚时，调用与try业务逻辑相对应的cancel业务逻辑。<br>可见，TCC在事务处理方式上，是很简单的：要么调用confirm业务逻辑，要么调用cancel逻辑。这里为什么没有提到try业务逻辑呢？因为try逻辑与全局事务处理无关。    </p>
+<p>当讨论2PC时，我们只专注于事务处理阶段，因而只讨论prepare和commit，所以，可能很多人都忘了，使用2PC事务管理机制时也是有业务逻辑阶段的。正是因为业务逻辑的执行，发起了全局事务，这才有其后的事务处理阶段。实际上，<strong>使用2PC机制时————以提交为例————一个完整的事务生命周期是：begin -&gt; 业务逻辑 -&gt; prepare -&gt; commit</strong>。    </p>
+<p>再看TCC，也不外乎如此。我们要发起全局事务，同样也必须通过执行一段业务逻辑来实现。该业务逻辑一来通过执行触发TCC全局事务的创建；二来也需要执行部分数据写操作；此外，还要通过执行来向TCC全局事务注册自己，以便后续TCC全局事务commit/rollback时回调其相应的confirm/cancel业务逻辑。所以，<strong>使用TCC机制时————以提交为例————一个完整的事务生命周期是：begin -&gt; 业务逻辑(try业务) -&gt; commit(comfirm业务)</strong>。    </p>
+<p>综上，我们可以从执行的阶段上将二者一一对应起来：<br>1、 2PC机制的业务阶段 等价于 TCC机制的try业务阶段；<br>2、 2PC机制的提交阶段（prepare &amp; commit） 等价于 TCC机制的提交阶段（confirm）；<br>3、 2PC机制的回滚阶段（rollback） 等价于 TCC机制的回滚阶段（cancel）。    </p>
+<p>因此，可以看出，虽然TCC机制中有两个阶段都存在业务逻辑的执行，但其中try业务阶段其实是与全局事务处理无关的。认清了这一点，当我们再比较TCC和2PC时，就会很容易地发现，TCC不是两阶段提交，而只是它对事务的提交/回滚是通过执行一段confirm/cancel业务逻辑来实现，仅此而已。    </p>
+
+        
+      </div>
+      <footer><div class="article-comment">
+        
+<section id="comment">
+  <h1 class="title">comment</h1>
+
+  
+</section>
+
+
+      </div></footer>
+    </div>
+  </div>
+</article>
+
+  </div>
+  </div>
+  <footer id="footer">
+    <div class="wrap">
+  <div class="inner" style="text-align: center">
+    
+    &copy; 2017 liuyangming All Rights Reserved
+    
+
+    / <a href="https://github.com/kywk/hexo-theme-biture">biture</a> for <a href="http://zespia.tw/hexo/">hexo</a>
+    / developed by <a href="http://kywk.github.io/moco/">MooCow (kywk)</a>.
+  </div>
+</div>
+
+  </footer>
+<!-- Le javascript -->
+<!-- Placed at the end of the document so the pages load faster -->
+<script src="//ajax.googleapis.com/ajax/libs/jquery/1/jquery.min.js"></script>
+
+
+<!-- Responsive menu -->
+<script>
+$(document).ready(function() {
+  $("#menu-toggle").click(function(event) {
+    event.preventDefault();
+    if ($(this).hasClass("isShow")) {
+      $("#header").css({position: "fixed"});
+      $("ul.nav-menu").hide();
+      $(this).removeClass("isShow");
+    } else {
+      $("#header").css({position: "static"});
+      $("ul.nav-menu").show();
+      $("html, body").scrollTop(0);
+      $(this).addClass("isShow");
+    }
+    return false;
+  });
+
+  $(window).resize(function() {
+    if ($(window).width() > 700) {
+      $("ul.nav-menu").removeAttr('style');
+    }
+  });
+
+});
+</script>
+
+
+
+
+
+
+<link rel="stylesheet" href="/package/fancybox/jquery.fancybox.css?v=2.1.5" type="text/css" media="screen" />
+<script type="text/javascript" src="/package/fancybox/jquery.fancybox.pack.js?v=2.1.5"></script>
+<script type="text/javascript">
+(function($){
+  $(".fancybox").fancybox();
+  $(".various").fancybox({
+    maxWidth  : 800,
+    maxHeight : 600,
+    fitToView : false,
+    width   : '70%',
+    height    : '70%',
+    autoSize  : true,
+    closeClick  : false,
+    openEffect  : 'none',
+    closeEffect : 'none'
+  });
+})(jQuery);
+</script>
+
+
+</body>
+</html>

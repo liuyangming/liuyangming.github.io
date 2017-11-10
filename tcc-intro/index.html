@@ -1,0 +1,205 @@
+<!DOCTYPE HTML>
+<html>
+<head>
+  <meta charset="utf-8">
+  
+  <title>TCC事务机制简介 | 百特开源</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+  
+  
+
+  <link href="//netdna.bootstrapcdn.com/font-awesome/4.0.3/css/font-awesome.css" rel="stylesheet">
+  <link rel="stylesheet" href="/css/pure-min.css" type="text/css">
+  <link rel="stylesheet" href="/css/biture.css" type="text/css">
+  <!--[if lt IE 9]><script src="//html5shiv.googlecode.com/svn/trunk/html5.js"></script><![endif]-->
+  
+
+</head>
+
+
+<body>
+  <header id="header">
+    <div class="wrap">
+  <div class="inner">
+    <a class="brand" href="/">百特开源</a>
+    <a id="menu-toggle" href="#"><i class="fa fa-bars"></i></a>
+<ul class="nav-menu">
+
+
+    <li><a href="/">Home</a></li>
+
+
+
+    <li><a href="//github.com/liuyangming/bytetcc">ByteTCC</a></li>
+
+
+
+    <li><a href="//github.com/liuyangming/bytejta">ByteJTA</a></li>
+
+
+</ul>
+
+<ul class="nav-menu ext-menu">
+
+
+    <li><a href="//github.com/liuyangming/">github</a></li>
+
+
+
+    <li><a href="//hexo.io/">hexo</a></li>
+
+
+  <li><a class="various" href="#fbox-tagcloud">tags</a></li>
+</ul>
+</div>
+
+  </div>
+</div>
+
+<div class="tagcloud" id="fbox-tagcloud" style="margin:10px; display:none; overflow: hidden"><a href="/tags/ByteTCC/" style="font-size: 14px;">ByteTCC</a> <a href="/tags/TCC/" style="font-size: 14px;">TCC</a> <a href="/tags/Transaction/" style="font-size: 14px;">Transaction</a></div>
+
+  </header>
+  <div id="main-content" class="wrap">
+  <div class="inner">
+    <article class="post">
+  <div class="pure-g">
+
+    <!-- article: meta -->
+    <div class="pure-u-1-12 article-meta">
+      <div class="date"><time datetime="2017-03-29T05:20:08.000Z">
+        <div class="day">29</div>
+        <div class="month">Mar 2017</div>
+      </time></div>
+      <div class="article-tags">
+        
+  
+    <a href='/tags/TCC/' class='pure-button pull-right' style='margin:3px;'>TCC</a>
+  
+    <a href='/tags/Transaction/' class='pure-button pull-right' style='margin:3px;'>Transaction</a>
+  
+    <a href='/tags/ByteTCC/' class='pure-button pull-right' style='margin:3px;'>ByteTCC</a>
+  
+
+
+      </div>
+    </div>
+
+    <!-- article: main -->
+    <div class="pure-u-11-12">
+      <header><div class="article-title">
+        
+  
+    <h1 class="title">TCC事务机制简介</h1>
+  
+
+      </div></header>
+      <div class="article-entry">
+        
+          <p>关于TCC（Try-Confirm-Cancel）的概念，最早是由Pat Helland于2007年发表的一篇名为《Life beyond Distributed Transactions:an Apostate’s Opinion》的论文提出。在该论文中，TCC还是以Tentative-Confirmation-Cancellation作为名称；正式以Try-Confirm-Cancel作为名称的，可能是Atomikos（Gregor Hohpe所著书籍《Enterprise Integration Patterns》中收录了关于TCC的介绍，提到了Atomikos的Try-Confirm-Cancel，并认为二者是相似的概念）。    </p>
+<p>国内最早关于TCC的报道，应该是InfoQ上对阿里程立博士的一篇采访。经过程博士的这一次传道之后，TCC在国内逐渐被大家广为了解并接受。相应的实现方案和开源框架也先后被发布出来，<a href="https://github.com/liuyangming/ByteTCC" target="_blank" rel="external">ByteTCC</a>就是其中之一。    </p>
+<p>TCC事务机制相对于传统事务机制（X/Open XA Two-Phase-Commit），其特征在于它不依赖资源管理器(RM)对XA的支持，而是通过对（由业务系统提供的）业务逻辑的调度来实现分布式事务。    </p>
+<p>对于业务系统中一个特定的业务逻辑S，其对外提供服务时，必须接受一些不确定性，即对业务逻辑执行的一次调用仅是一个临时性操作，调用它的消费方服务M保留了后续的取消权。如果M认为全局事务应该rollback，它会要求取消之前的临时性操作，这将对应S的一个取消操作；而当M认为全局事务应该commit时，它会放弃之前临时性操作的取消权，这对应S的一个确认操作。    </p>
+<p>每一个初步操作，最终都会被确认或取消。因此，针对一个具体的业务服务，TCC事务机制需要业务系统提供三段业务逻辑：初步操作Try、确认操作Confirm、取消操作Cancel。    </p>
+<p><strong>1. 初步操作（Try）</strong><br>TCC事务机制中的业务逻辑（Try），从执行阶段来看，与传统事务机制中业务逻辑相同。但从业务角度来看，却不一样。TCC机制中的Try仅是一个初步操作，它和后续的确认一起才能真正构成一个完整的业务逻辑。可以认为<br><figure class="highlight java"><table><tr><td class="gutter"><pre><div class="line">1</div></pre></td><td class="code"><pre><div class="line">[传统事务机制]的业务逻辑 = [TCC事务机制]的初步操作（Try） + [TCC事务机制]的确认逻辑（Confirm）。</div></pre></td></tr></table></figure></p>
+<p>TCC机制将传统事务机制中的业务逻辑一分为二，拆分后保留的部分即为初步操作（Try）；而分离出的部分即为确认操作（Confirm），被延迟到事务提交阶段执行。<br>TCC事务机制以初步操作（Try）为中心的，确认操作（Confirm）和取消操作（Cancel）都是围绕初步操作（Try）而展开。因此，Try阶段中的操作，其保障性是最好的，即使失败，仍然有取消操作（Cancel）可以将其不良影响进行回撤。    </p>
+<p><strong>2. 确认操作（Confirm）</strong><br>确认操作（Confirm）是对初步操作（Try）的一个补充。当TCC事务管理器决定commit全局事务时，就会逐个执行初步操作（Try）指定的确认操作（Confirm），将初步操作（Try）未完成的事项最终完成。    </p>
+<p><strong>3. 取消操作（Cancel）</strong><br>取消操作（Cancel）是对初步操作（Try）的一个回撤。当TCC事务管理器决定rollback全局事务时，就会逐个执行初步操作（Try）指定的取消操作（Cancel），将初步操作（Try）已完成的事项全部撤回。    </p>
+<p>在传统事务机制中，业务逻辑的执行和事务的处理，是在不同的阶段由不同的部件来完成的：业务逻辑部分访问资源实现数据存储，其处理是由业务系统负责；事务处理部分通过协调资源管理器以实现事务管理，其处理由事务管理器来负责。二者没有太多交互的地方，所以，传统事务管理器的事务处理逻辑，仅需要着眼于事务完成（commit/rollback）阶段，而不必关注业务执行阶段。    </p>
+<p>而在TCC事务机制中的业务逻辑处理和事务处理，其关系就错综复杂：业务逻辑（Try/Confirm/Cancel）阶段涉及所参与资源事务的commit/rollback；全局事务commit/rollback时又涉及到业务逻辑（Try/Confirm/Cancel）的执行。其中关系，本站将另行撰文详细介绍，敬请关注！    </p>
+<p>参考文献：    </p>
+<ol>
+<li><a href="http://www.infoq.com/cn/interviews/soa-chengli" target="_blank" rel="external">http://www.infoq.com/cn/interviews/soa-chengli</a>    </li>
+<li><a href="https://cs.brown.edu/courses/cs227/archives/2012/papers/weaker/cidr07p15.pdf" target="_blank" rel="external">https://cs.brown.edu/courses/cs227/archives/2012/papers/weaker/cidr07p15.pdf</a>    </li>
+<li><a href="http://www.enterpriseintegrationpatterns.com/patterns/conversation/TryConfirmCancel.html" target="_blank" rel="external">http://www.enterpriseintegrationpatterns.com/patterns/conversation/TryConfirmCancel.html</a>    </li>
+</ol>
+
+        
+      </div>
+      <footer><div class="article-comment">
+        
+<section id="comment">
+  <h1 class="title">comment</h1>
+
+  
+</section>
+
+
+      </div></footer>
+    </div>
+  </div>
+</article>
+
+  </div>
+  </div>
+  <footer id="footer">
+    <div class="wrap">
+  <div class="inner" style="text-align: center">
+    
+    &copy; 2017 liuyangming All Rights Reserved
+    
+
+    / <a href="https://github.com/kywk/hexo-theme-biture">biture</a> for <a href="http://zespia.tw/hexo/">hexo</a>
+    / developed by <a href="http://kywk.github.io/moco/">MooCow (kywk)</a>.
+  </div>
+</div>
+
+  </footer>
+<!-- Le javascript -->
+<!-- Placed at the end of the document so the pages load faster -->
+<script src="//ajax.googleapis.com/ajax/libs/jquery/1/jquery.min.js"></script>
+
+
+<!-- Responsive menu -->
+<script>
+$(document).ready(function() {
+  $("#menu-toggle").click(function(event) {
+    event.preventDefault();
+    if ($(this).hasClass("isShow")) {
+      $("#header").css({position: "fixed"});
+      $("ul.nav-menu").hide();
+      $(this).removeClass("isShow");
+    } else {
+      $("#header").css({position: "static"});
+      $("ul.nav-menu").show();
+      $("html, body").scrollTop(0);
+      $(this).addClass("isShow");
+    }
+    return false;
+  });
+
+  $(window).resize(function() {
+    if ($(window).width() > 700) {
+      $("ul.nav-menu").removeAttr('style');
+    }
+  });
+
+});
+</script>
+
+
+
+
+
+
+<link rel="stylesheet" href="/package/fancybox/jquery.fancybox.css?v=2.1.5" type="text/css" media="screen" />
+<script type="text/javascript" src="/package/fancybox/jquery.fancybox.pack.js?v=2.1.5"></script>
+<script type="text/javascript">
+(function($){
+  $(".fancybox").fancybox();
+  $(".various").fancybox({
+    maxWidth  : 800,
+    maxHeight : 600,
+    fitToView : false,
+    width   : '70%',
+    height    : '70%',
+    autoSize  : true,
+    closeClick  : false,
+    openEffect  : 'none',
+    closeEffect : 'none'
+  });
+})(jQuery);
+</script>
+
+
+</body>
+</html>
