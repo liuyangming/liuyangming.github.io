@@ -125,7 +125,7 @@
 <p>这种情况下，由于[B:Cancel]执行时，[B:Try]尚未生效（其RM本地事务尚未提交），因此，[B:Cancel]是不能执行的，至少是不能生效（执行了其RM本地事务也要rollback）的。然而，当<br>[B:Cancel]处理完毕（跳过执行、或者执行后rollback其RM本地事务）后，[B:Try]操作完成又生效了（其RM本地事务成功提交），这就会使得[B:Cancel]虽然提供了，但却没有起到回撤[B:Try]的作用，导致数据的不一致。</p>
 <p>所以，TCC框架在这种情况下，需要：<br>1）将[B:Try]的本地事务标注为rollbackOnly，阻止其后续生效；<br>2）禁止其再次将事务上下文传递给其他远程分支，否则该问题将在其他分支上出现；<br>3）相应地，[B:Cancel]也不必执行，至少不能生效。</p>
 <blockquote>
-<p>当然，TCC事务框架也可以简单的选择阻塞[B:Cancel]，待[B:Try]执行完毕后，再根据它的执行情况判断是否需要执行[B:Cancel]。不过，这种处理方式因为需要等待，所以，处理效率上会有所不及。</p>
+<p>当然，TCC事务框架也可以简单的选择阻塞[B:Cancel]的处理，待[B:Try]执行完毕后，再根据它的执行情况判断是否需要执行[B:Cancel]。不过，这种处理方式因为需要等待，所以，处理效率上会有所不及。</p>
 </blockquote>
 <p>同样的情况也会出现在confirm业务上，只不过，发生在Confirm业务上的处理逻辑与发生在Cancel业务上的处理逻辑会不一样，TCC框架必须保证：<br>1）Confirm业务在Try业务之后执行，若发现并行，则只能阻塞相应的Confirm业务操作；<br>2）在进入Confirm执行阶段之后，也不可以再提交同一全局事务内的新的Try操作的RM本地事务。</p>
 <h4 id="七、TCC服务复用性是不是相对较差？"><a href="#七、TCC服务复用性是不是相对较差？" class="headerlink" title="七、TCC服务复用性是不是相对较差？"></a><strong>七、TCC服务复用性是不是相对较差？</strong></h4><p>TCC事务机制的定义，决定了一个服务需要提供三个业务实现：Try业务、Confirm业务、Cancel业务。可能会有人因此认为TCC服务的复用性较差。怎么说呢，要是将 Try/Confirm/Cancel业务逻辑单独拿出来复用，其复用性当然是不好的，Try/Confirm/Cancel 逻辑作为TCC型服务中的一部分，是不能单独作为一个组件来复用的。Try、Confirm、Cancel业务共同才构成一个组件，如果要复用，应该是复用整个TCC服务组件，而不是单独的Try/Confirm/Cancel业务。</p>
